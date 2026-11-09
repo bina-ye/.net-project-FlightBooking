@@ -1,4 +1,5 @@
-﻿using FlightBooking.Core.Interfaces;
+﻿using FlightBooking.API.Middleware;
+using FlightBooking.Core.Interfaces;
 using FlightBooking.Data.Context;
 using FlightBooking.Data.Repositories;
 using FlightBooking.Data.Seed;
@@ -9,8 +10,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
-using Microsoft.OpenApi.Models;
+using NLog.Web;
+
+
 var builder = WebApplication.CreateBuilder(args);
+// ---------- NLog ----------
+builder.Logging.ClearProviders();
+builder.Host.UseNLog();
 
 // ---------- Data ----------
 builder.Services.AddDbContext<FlightBookingDbContext>(options =>
@@ -85,6 +91,7 @@ builder.Services.AddSwaggerGen(options =>
         }
     });
 });
+
 var app = builder.Build();
 
 // ---------- Migration + Seed ----------
@@ -93,6 +100,11 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<FlightBookingDbContext>();
     await DbSeeder.SeedAsync(db);
 }
+
+// ---------- Pipeline ----------
+app.UseCorrelationId();
+app.UseErrorHandling();
+app.UseShabbat();
 
 if (app.Environment.IsDevelopment())
 {

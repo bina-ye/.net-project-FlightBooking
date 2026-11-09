@@ -1,9 +1,21 @@
+﻿# Build
 bin/
 obj/
+# IDE
 .vs/
 *.user
 *.suo
+*.csproj.Backup.tmp
+# Logs
+logs/
+*.log
+# Secrets / local settings
 appsettings.Development.json
+.env
+# Local databases
 *.db
 *.db-shm
 *.db-wal
+# OS
+Thumbs.db
+.DS_Store
