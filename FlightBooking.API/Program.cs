@@ -61,6 +61,20 @@ builder.Services
 builder.Services.AddAuthorization();
 
 builder.Services.AddControllers();
+// ---------- CORS (לצד הלקוח בפיתוח) ----------
+const string ClientCorsPolicy = "ClientPolicy";
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(ClientCorsPolicy, policy =>
+    {
+        policy.WithOrigins(
+                "http://localhost:5500",     // Live Server
+                "http://127.0.0.1:5500")
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
 builder.Services.AddEndpointsApiExplorer();
 
 
@@ -105,6 +119,7 @@ using (var scope = app.Services.CreateScope())
 app.UseCorrelationId();
 app.UseErrorHandling();
 app.UseShabbat();
+app.UseCors(ClientCorsPolicy);
 
 if (app.Environment.IsDevelopment())
 {
