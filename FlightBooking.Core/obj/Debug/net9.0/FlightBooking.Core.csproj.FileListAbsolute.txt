@@ -1,0 +1,12 @@
+C:\binatiH.w\project .net\FlightBooking\FlightBooking.Core\bin\Debug\net9.0\FlightBooking.Core.deps.json
+C:\binatiH.w\project .net\FlightBooking\FlightBooking.Core\bin\Debug\net9.0\FlightBooking.Core.dll
+C:\binatiH.w\project .net\FlightBooking\FlightBooking.Core\bin\Debug\net9.0\FlightBooking.Core.pdb
+C:\binatiH.w\project .net\FlightBooking\FlightBooking.Core\obj\Debug\net9.0\FlightBooking.Core.GeneratedMSBuildEditorConfig.editorconfig
+C:\binatiH.w\project .net\FlightBooking\FlightBooking.Core\obj\Debug\net9.0\FlightBooking.Core.AssemblyInfoInputs.cache
+C:\binatiH.w\project .net\FlightBooking\FlightBooking.Core\obj\Debug\net9.0\FlightBooking.Core.AssemblyInfo.cs
+C:\binatiH.w\project .net\FlightBooking\FlightBooking.Core\obj\Debug\net9.0\FlightBooking.Core.csproj.CoreCompileInputs.cache
+C:\binatiH.w\project .net\FlightBooking\FlightBooking.Core\obj\Debug\net9.0\FlightBooking.Core.dll
+C:\binatiH.w\project .net\FlightBooking\FlightBooking.Core\obj\Debug\net9.0\refint\FlightBooking.Core.dll
+C:\binatiH.w\project .net\FlightBooking\FlightBooking.Core\obj\Debug\net9.0\FlightBooking.Core.pdb
+C:\binatiH.w\project .net\FlightBooking\FlightBooking.Core\obj\Debug\net9.0\ref\FlightBooking.Core.dll
+C:\binatiH.w\project .net\FlightBooking\FlightBooking.Core\obj\Debug\net9.0\FlightBooking.Core.sourcelink.json

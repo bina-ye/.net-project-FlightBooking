@@ -1,0 +1,23 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v9.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v9.0": {
+      "FlightBooking.Core/1.0.0": {
+        "runtime": {
+          "FlightBooking.Core.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "FlightBooking.Core/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}
