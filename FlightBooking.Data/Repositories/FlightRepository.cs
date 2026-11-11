@@ -75,4 +75,22 @@ public class FlightRepository : IFlightRepository
                 .ThenInclude(f => f.DestinationAirport)
             .FirstOrDefaultAsync(s => s.Id == seatId, ct);
     }
+    public Task<Airport?> GetAirportByCodeAsync(string code, CancellationToken ct = default)
+    {
+        var normalized = code.Trim().ToUpperInvariant();
+        return _context.Airports.FirstOrDefaultAsync(a => a.Code == normalized, ct);
+    }
+
+    public Task<bool> ExistsByNumberAsync(string flightNumber, CancellationToken ct = default)
+    {
+        var normalized = flightNumber.Trim().ToUpperInvariant();
+        return _context.Flights.AnyAsync(f => f.FlightNumber == normalized, ct);
+    }
+
+    public async Task AddAsync(Flight flight, CancellationToken ct = default)
+    {
+        _context.Flights.Add(flight);
+        await _context.SaveChangesAsync(ct);
+    }
+
 }

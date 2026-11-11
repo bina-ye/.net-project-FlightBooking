@@ -17,4 +17,8 @@ public interface IFlightRepository
     Task<List<Seat>> GetSeatsAsync(int flightId, CancellationToken ct = default);
 
     Task<Seat?> GetSeatWithFlightAsync(int seatId, CancellationToken ct = default);
+    Task<Airport?> GetAirportByCodeAsync(string code, CancellationToken ct = default);
+    Task<bool> ExistsByNumberAsync(string flightNumber, CancellationToken ct = default);
+    Task AddAsync(Flight flight, CancellationToken ct = default);
+
 }

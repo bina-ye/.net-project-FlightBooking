@@ -4,6 +4,8 @@ using FlightBooking.Core.DTOs.Seats;
 using FlightBooking.Core.Entities;
 using FlightBooking.Core.Enums;
 using FlightBooking.Core.Interfaces;
+using FlightBooking.Core.Seats;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace FlightBooking.Service.Services;
@@ -113,4 +115,73 @@ public class FlightService : IFlightService
         AircraftType = flight.AircraftType,
         AvailableSeatsCount = flight.Seats.Count(s => s.Status == SeatStatus.Available)
     };
+
+    public async Task<Result<FlightResponse>> CreateAsync(
+    FlightCreateRequest request, CancellationToken ct = default)
+    {
+        var originCode = request.OriginCode.Trim().ToUpperInvariant();
+        var destinationCode = request.DestinationCode.Trim().ToUpperInvariant();
+
+        if (originCode == destinationCode)
+        {
+            return Result<FlightResponse>.BadRequest(
+                "נמל המוצא ונמל היעד חייבים להיות שונים.");
+        }
+
+        var origin = await _flights.GetAirportByCodeAsync(originCode, ct);
+        if (origin is null)
+        {
+            return Result<FlightResponse>.BadRequest($"שדה התעופה {originCode} לא נמצא.");
+        }
+
+        var destination = await _flights.GetAirportByCodeAsync(destinationCode, ct);
+        if (destination is null)
+        {
+            return Result<FlightResponse>.BadRequest($"שדה התעופה {destinationCode} לא נמצא.");
+        }
+
+        if (request.DepartureTime <= DateTime.UtcNow)
+        {
+            return Result<FlightResponse>.BadRequest("זמן ההמראה חייב להיות בעתיד.");
+        }
+
+        if (request.ArrivalTime <= request.DepartureTime)
+        {
+            return Result<FlightResponse>.BadRequest("זמן הנחיתה חייב להיות אחרי ההמראה.");
+        }
+
+        var flightNumber = request.FlightNumber.Trim().ToUpperInvariant();
+        if (await _flights.ExistsByNumberAsync(flightNumber, ct))
+        {
+            return Result<FlightResponse>.Conflict($"מספר הטיסה {flightNumber} כבר קיים.");
+        }
+
+        var flight = new Flight
+        {
+            FlightNumber = flightNumber,
+            OriginAirportId = origin.Id,
+            DestinationAirportId = destination.Id,
+            DepartureTime = request.DepartureTime,
+            ArrivalTime = request.ArrivalTime,
+            CheckInOpensAt = request.DepartureTime.AddHours(-3),
+            BoardingTime = request.DepartureTime.AddMinutes(-40),
+            Gate = request.Gate.Trim(),
+            Price = request.Price,
+            AircraftType = request.AircraftType.Trim()
+        };
+
+        flight.Seats = SeatFactory.CreateForFlight(flight);
+
+        await _flights.AddAsync(flight, ct);
+
+        _logger.LogInformation(
+            "Admin created flight {FlightNumber} with {SeatCount} seats (Id={FlightId})",
+            flight.FlightNumber, flight.Seats.Count, flight.Id);
+
+        // שדות התעופה נדרשים למיפוי — הם לא נטענים אוטומטית
+        flight.OriginAirport = origin;
+        flight.DestinationAirport = destination;
+
+        return Result<FlightResponse>.Created(MapFlight(flight));
+    }
 }
