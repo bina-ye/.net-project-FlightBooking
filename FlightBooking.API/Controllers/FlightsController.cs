@@ -71,4 +71,26 @@ public class FlightsController : ControllerBase
             _ => BadRequest(new { message = result.ErrorMessage })
         };
     }
+    /// <summary>יצירת טיסה חדשה (מנהל בלבד).</summary>
+    [HttpPost]
+    [Authorize(Roles = "Admin")]
+    [ProducesResponseType(typeof(FlightResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Create(
+        [FromBody] FlightCreateRequest request, CancellationToken ct)
+    {
+        if (!ModelState.IsValid)
+            return ValidationProblem(ModelState);
+
+        var result = await _flights.CreateAsync(request, ct);
+
+        return result.Status switch
+        {
+            ResultStatus.Created => CreatedAtAction(
+                nameof(GetById), new { id = result.Value!.Id }, result.Value),
+            ResultStatus.Conflict => Conflict(new { message = result.ErrorMessage }),
+            _ => BadRequest(new { message = result.ErrorMessage })
+        };
+    }
 }
