@@ -1,32 +1,88 @@
-# FlightBooking — צד הלקוח
+# FlightBooking - שרת
 
-## תיאור
+## תיאור המערכת
 
-ממשק Web לצפייה, סינון והזמנת טיסות, המדבר אל FlightBooking.API.
-המשתמש יכול לחפש טיסות, לסנן לפי מוצא, יעד וטווח תאריכים, לבחור מושב פנוי,
-להשלים הזמנה עם תשלום מדומה, ולנהל את ההזמנות שלו.
+מערכת הזמנת כרטיסי טיסה: Web API לניהול טיסות, מושבים והזמנות.
+המערכת מאפשרת חיפוש וסינון טיסות, בחירת מושב פנוי, תשלום מדומה,
+והשלמת הזמנה עם העדפות אוכל וכשרות ופרטי נוסע.
 
-## דרישות
+הפרויקט בנוי בארבע שכבות: `FlightBooking.Core` (ישויות, DTOs, ממשקים),
+`FlightBooking.Data` (DbContext, repositories, migrations),
+`FlightBooking.Service` (לוגיקה עסקית), ו-`FlightBooking.API`
+(Controllers, Middleware, `Program.cs`).
 
-דפדפן מודרני בלבד. אין תהליך build ואין תלויות npm — הקבצים מוגשים כפי שהם.
+טכנולוגיות: .NET 9, ASP.NET Core Web API, EF Core 9, PostgreSQL,
+JWT, AutoMapper, NLog, xUnit + Moq.
 
-## הרצה מקומית
+## המשאב המוגבל - המושב
 
-1. השרת חייב לרוץ על `http://localhost:5069` — ראו את ריפו השרת.
-2. הגישו את הקבצים דרך שרת HTTP מקומי (Live Server, `npx serve`, או `python -m http.server 5500`) — לא דרך `file://`.
-3. ודאו ש-`API_BASE` בקובץ `js/api.js` מותאם לפורט של השרת.
-4. אם הדף מוגש מפורט אחר, הוסיפו אותו ל-CORS ב-`Program.cs` של השרת.
+המשאב שעליו מתחרים הוא **המושב**. אין שדה קיבולת על טיסה - מקום פנוי
+הוא מקום פנוי, ומקור האמת היחיד הוא שורת המושב עצמה.
 
-## מסכים
+התחרות נוצרת בין הרגע שבו משתמש רואה מושב כפנוי ובוחר אותו, לבין הרגע
+שבו ההזמנה נשמרת. בחלון הזה משתמש אחר יכול לתפוס את אותו מושב.
 
-| דף | תיאור |
-|---|---|
-| `index.html` | חיפוש טיסות לפי מוצא, יעד ותאריך |
-| `flights.html` | קטלוג כל הטיסות, עם סינון ועימוד מול השרת |
-| `seats.html` | מפת מושבים ובחירת מושב פנוי |
-| `booking.html` | השלמת הזמנה, תשלום מדומה והעדפות אוכל וכשרות |
-| `my-bookings.html` | ההזמנות של המשתמש המחובר |
-| `login.html` | התחברות והרשמה |
+המערכת פותרת זאת ב-optimistic concurrency:
+
+- לכל מושב יש `RowVersion` (`uint`) הממופה לעמודת המערכת `xmin` של
+  PostgreSQL באמצעות `IsRowVersion()`.
+- EF Core מוסיף את הערך הישן לתנאי ה-`WHERE` של ה-`UPDATE`.
+- אם השורה השתנתה בינתיים - אף שורה לא מתעדכנת, ו-EF Core זורק
+  `DbUpdateConcurrencyException`.
+- החריגה נתפסת בשכבת ה-Service ומוחזרת כ-409 Conflict עם הודעה
+  ברורה, והיא נרשמת ללוג ברמת Warning.
+
+התשלום מתבצע לפני שמירת ההזמנה. במקרה של התנגשות נרשם לוג עם מזהה
+העסקה; ב-`MockPaymentService` אין חיוב אמיתי ולכן החזר כספי אינו ממומש.
+
+הצד הלקוח מציג הודעה ברורה כשהוא מקבל 409 ומציע לבחור מושב אחר.
+
+## הוראות הרצה מקומית
+
+### דרישות מקדימות
+
+- .NET 9 SDK
+- PostgreSQL 17 (או Docker)
+
+### הרמת בסיס הנתונים
+
+```bash
+docker run --name pg -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres:16
+```
+
+### הגדרת סודות
+
+מחרוזת החיבור ומפתח ה-JWT אינם בקוד ואינם ב-repo.
+
+```bash
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5432;Database=flightbooking_dev;Username=postgres;Password=postgres" --project FlightBooking.API
+dotnet user-secrets set "Jwt:Key" "<key-of-64-chars>" --project FlightBooking.API
+```
+
+### הפעלה
+
+```bash
+dotnet restore
+dotnet run --project FlightBooking.API
+```
+
+Swagger: `http://localhost:5069/swagger`
+
+בעליית השרת מתבצעים אוטומטית migrations וטעינת נתוני דמו - שדות תעופה,
+טיסות, מושבים ומשתמשים. אין צורך בהתערבות ידנית בבסיס הנתונים.
+
+### הרצת בדיקות
+
+```bash
+dotnet test
+```
+
+בדיקות התחרות דורשות בסיס נתונים אמיתי:
+
+```bash
+export FLIGHTBOOKING_TEST_DB="Host=localhost;Port=5432;Database=flightbooking_test;Username=postgres;Password=postgres"
+dotnet test
+```
 
 ## משתמשי דמו
 
@@ -35,9 +91,83 @@
 | מנהל | admin@flightbooking.local | Password123! |
 | לקוח | customer@flightbooking.local | Password123! |
 
-## טיפול בהתנגשות (409)
+## Endpoints
 
-כשהשרת מחזיר 409 — כלומר המושב נתפס על ידי משתמש אחר בין בחירתו לשמירת ההזמנה —
-הדף מציג הודעה ברורה למשתמש ומציע לבחור מושב אחר, בלי לאבד את שאר פרטי ההזמנה.
-זהו המצב שבו נבחנת ההתאמה בין השרת ללקוח: השרת מחזיר סטטוס מדויק, והלקוח מתרגם אותו להודעה מובנת.
+| Method | Path | הרשאה | תיאור |
+|---|---|---|---|
+| POST | `/api/auth/tokens` | אנונימי | התחברות, מחזיר JWT |
+| POST | `/api/users` | אנונימי | הרשמה, מחזיר 201 עם Location |
+| GET | `/api/users/me` | מאומת | פרופיל המשתמש המחובר |
+| GET | `/api/users/{id}` | מאומת | פרטי משתמש; מנהל או המשתמש עצמו |
+| GET | `/api/flights` | אנונימי | חיפוש טיסות עם עימוד |
+| GET | `/api/flights/catalog` | אנונימי | קטלוג כל הטיסות עם סינון ועימוד |
+| GET | `/api/flights/{id}` | אנונימי | פרטי טיסה |
+| GET | `/api/flights/{id}/seats` | אנונימי | מושבי הטיסה וזמינותם |
+| POST | `/api/flights` | מנהל | יצירת טיסה חדשה |
+| POST | `/api/bookings` | מאומת | יצירת הזמנה, מחזיר 201 עם Location |
+| GET | `/api/bookings/{id}` | בעלים או מנהל | פרטי הזמנה |
+| GET | `/api/bookings/my` | מאומת | ההזמנות שלי עם עימוד |
+| PUT | `/api/bookings/{id}` | בעלים או מנהל | עדכון הזמנה והחלפת מושבים |
+| DELETE | `/api/bookings/{id}` | בעלים או מנהל | ביטול הזמנה, מחזיר 204 |
 
+### פרמטרים של הקטלוג
+
+| פרמטר | טיפוס | ברירת מחדל | תיאור |
+|---|---|---|---|
+| `pageNumber` | int | 1 | מספר עמוד |
+| `pageSize` | int | 10 | גודל עמוד (עד 50) |
+| `originCode` | string | - | קוד נמל מוצא (3 אותיות) |
+| `destinationCode` | string | - | קוד נמל יעד (3 אותיות) |
+| `fromDate` | date | - | מתאריך יציאה (YYYY-MM-DD) |
+| `toDate` | date | - | עד תאריך יציאה (YYYY-MM-DD) |
+| `includePast` | bool | false | טיסות שהמריאו - מנהל בלבד |
+
+## בדיקות
+
+41 בדיקות:
+
+- בדיקות יחידה ל-`BookingService` ו-`FlightService` באמצעות Moq.
+- בדיקות תחרות מול PostgreSQL אמיתי (`ConcurrencyTests`): שני
+  `DbContext` נפרדים קוראים את אותו מושב, שניהם משנים אותו, הראשון
+  שומר בהצלחה והשני מקבל `DbUpdateConcurrencyException`.
+
+## Middleware
+
+| Middleware | תפקיד |
+|---|---|
+| `CorrelationIdMiddleware` | מוסיף `X-Correlation-Id` לכל בקשה ותגובה ורושם אותו בכל שורת לוג |
+| `ErrorHandlingMiddleware` | תופס חריגות לא צפויות ומחזיר ProblemDetails עם correlationId |
+| `ShabbatMiddleware` | חוסם פעילות בשבת ומחזיר 503; כבוי כברירת מחדל ב-Development |
+
+שגיאות עסקיות - מושב תפוס, טיסה שהמריאה, תשלום נכשל - אינן עוברות
+כ-middleware. הן מוחזרות כ-`Result` מהשכבה העסקית וממופות לסטטוס HTTP
+ב-Controller.
+
+## לוגים
+
+NLog כותב לנתיב `FlightBooking.API/bin/Debug/net9.0/logs/` בקובץ יומי,
+בקידוד UTF-8, עם שמירה של 30 יום אחורה.
+
+- Information - כל בקשה נכנסת, עם ה-CorrelationId
+- Warning - התנגשות על מושב
+- Error - חריגות שנתפסו
+
+סיסמאות, טוקנים ומספרי כרטיסים אינם נרשמים.
+
+## צד הלקוח
+
+הממשק נמצא ב-repo נפרד. יש להריץ אותו על `http://localhost:5500`
+(מוגדר ב-CORS) או להוסיף את הפורט שלו ל-`Program.cs`.
+
+## החלטות תכנון
+
+- PostgreSQL ולא SQL Server - תמיכה מובנית ב-`xmin` כ-concurrency token.
+- תשלום מדומה - כרטיס המסתיים ב-0000 נדחה.
+- שמות עצם ברבים ופעולות HTTP תקניות, כולל 201 עם Location ו-204 בביטול.
+- JWT עם שני תפקידים - Admin ו-Customer, נאכף בשרת ולא רק בלקוח.
+- AutoMapper Profile - המיפוי בין הישויות ל-DTOs מוגדר במקום אחד.
+
+## מה לא נכלל
+
+העלאה לענן, Docker לפריסה, אחסון קבצים, אימות צד שלישי, caching,
+SignalR ו-CI - בהתאם לדרישות הפרויקט.
