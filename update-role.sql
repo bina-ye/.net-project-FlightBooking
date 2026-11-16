@@ -1,1 +1,0 @@
-UPDATE "Users" SET "Role" = 1 WHERE "Email" = 'by678319@gmail.com';

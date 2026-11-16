@@ -1,1 +1,0 @@
-SELECT COUNT(*) FROM "Bookings" b JOIN "Users" u ON b."UserId" = u."Id" WHERE u."Email" = 'by678319@gmail.com';
