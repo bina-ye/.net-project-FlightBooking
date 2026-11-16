@@ -21,4 +21,15 @@ public interface IBookingService
         int pageNumber,
         int pageSize,
         CancellationToken ct = default);
+    Task<Result<BookingResponse>> CancelAsync(
+    int bookingId,
+    int userId,
+    bool isAdmin,
+    CancellationToken ct = default);
+    Task<Result<BookingResponse>> UpdateAsync(
+    int bookingId,
+    int userId,
+    bool isAdmin,
+    BookingUpdateRequest request,
+    CancellationToken ct = default);
 }

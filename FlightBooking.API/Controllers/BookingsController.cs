@@ -104,4 +104,66 @@ public class BookingsController : ControllerBase
         var value = User.FindFirstValue(ClaimTypes.NameIdentifier);
         return int.TryParse(value, out var id) ? id : null;
     }
+    /// <summary>ביטול הזמנה עד 24 שעות לפני ההמראה. המושבים משוחררים בחזרה.</summary>
+    [HttpDelete("{id:int}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Cancel([FromRoute] int id, CancellationToken ct)
+    {
+        var userId = GetUserId();
+        if (userId is null)
+            return Unauthorized(new { message = "טוקן לא תקין." });
+
+        var isAdmin = User.IsInRole("Admin");
+
+        var result = await _bookings.CancelAsync(id, userId.Value, isAdmin, ct);
+
+        return result.Status switch
+        {
+            ResultStatus.Ok => NoContent(),
+            ResultStatus.Forbidden => StatusCode(
+                StatusCodes.Status403Forbidden, new { message = result.ErrorMessage }),
+            ResultStatus.NotFound => NotFound(new { message = result.ErrorMessage }),
+            ResultStatus.Conflict => Conflict(new { message = result.ErrorMessage }),
+            _ => BadRequest(new { message = result.ErrorMessage })
+        };
+    }
+    /// <summary>עדכון פרטי הזמנה והחלפת מושבים, עד 24 שעות לפני ההמראה.</summary>
+    [HttpPut("{id:int}")]
+    [ProducesResponseType(typeof(BookingResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Update(
+        [FromRoute] int id,
+        [FromBody] BookingUpdateRequest request,
+        CancellationToken ct)
+    {
+        if (!ModelState.IsValid)
+            return ValidationProblem(ModelState);
+
+        var userId = GetUserId();
+        if (userId is null)
+            return Unauthorized(new { message = "טוקן לא תקין." });
+
+        var isAdmin = User.IsInRole("Admin");
+
+        var result = await _bookings.UpdateAsync(id, userId.Value, isAdmin, request, ct);
+
+        return result.Status switch
+        {
+            ResultStatus.Ok => Ok(result.Value),
+            ResultStatus.Forbidden => StatusCode(
+                StatusCodes.Status403Forbidden, new { message = result.ErrorMessage }),
+            ResultStatus.NotFound => NotFound(new { message = result.ErrorMessage }),
+            ResultStatus.Conflict => Conflict(new { message = result.ErrorMessage }),
+            ResultStatus.BadRequest => BadRequest(new { message = result.ErrorMessage }),
+            _ => BadRequest(new { message = result.ErrorMessage })
+        };
+    }
 }

@@ -267,4 +267,188 @@ public class BookingService : IBookingService
                 SegmentOrder = bf.SegmentOrder
             }).ToList()
     };
+  
+
+    public async Task<Result<BookingResponse>> CancelAsync(
+    int bookingId, int userId, bool isAdmin, CancellationToken ct = default)
+    {
+        var booking = await _bookings.GetByIdForUpdateAsync(bookingId, ct);
+
+        if (booking is null)
+            return Result<BookingResponse>.NotFound("ההזמנה לא נמצאה.");
+
+        if (!isAdmin && booking.UserId != userId)
+            return Result<BookingResponse>.Forbidden("אין הרשאה לבטל הזמנה זו.");
+
+        if (booking.Status == BookingStatus.Cancelled)
+            return Result<BookingResponse>.Conflict("ההזמנה כבר בוטלה.");
+
+        // חלון הביטול: עד 24 שעות לפני ההמראה של הטיסה הראשונה
+        var firstDeparture = booking.BookingFlights
+            .Select(bf => (DateTime?)bf.Flight.DepartureTime)
+            .Min();
+
+        if (firstDeparture is null)
+            return Result<BookingResponse>.BadRequest("לא נמצאה טיסה עבור ההזמנה.");
+
+        var hoursLeft = (firstDeparture.Value - DateTime.UtcNow).TotalHours;
+
+        if (hoursLeft < 24)
+            return Result<BookingResponse>.Conflict(
+                "לא ניתן לבטל הזמנה בפחות מ-24 שעות לפני ההמראה.");
+
+        // מחיקה לוגית + שחרור המושבים
+        booking.Status = BookingStatus.Cancelled;
+        booking.CancelledAt = DateTime.UtcNow;
+
+        foreach (var seat in booking.Seats)
+        {
+            seat.Status = SeatStatus.Available;
+            seat.BookingId = null;
+            seat.BookedAt = null;
+        }
+
+        try
+        {
+            await _bookings.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            _logger.LogWarning(ex,
+                "התנגשות בשחרור מושבים בהזמנה {BookingReference}.",
+                booking.BookingReference);
+
+            return Result<BookingResponse>.Conflict(
+                "ההזמנה השתנתה בינתיים. נסי שוב.");
+        }
+
+        _logger.LogInformation(
+            "הזמנה {BookingReference} בוטלה על ידי משתמש {UserId}. שוחררו {Count} מושבים.",
+            booking.BookingReference, userId, booking.Seats.Count);
+
+        return Result<BookingResponse>.Ok(new BookingResponse
+        {
+            Id = booking.Id,
+            BookingReference = booking.BookingReference,
+            Status = booking.Status.ToString(),
+            CreatedAt = booking.CreatedAt,
+            TotalAmount = booking.TotalAmount
+        });
+    }
+    public async Task<Result<BookingResponse>> UpdateAsync(
+    int bookingId,
+    int userId,
+    bool isAdmin,
+    BookingUpdateRequest request,
+    CancellationToken ct = default)
+    {
+        if (request.SeatIds.Count == 0)
+            return Result<BookingResponse>.BadRequest("יש לבחור לפחות מושב אחד.");
+
+        if (request.SeatIds.Distinct().Count() != request.SeatIds.Count)
+            return Result<BookingResponse>.BadRequest("נבחר אותו מושב יותר מפעם אחת.");
+
+        // 1. טעינה עם tracking — אנחנו עומדים לשנות
+        var booking = await _bookings.GetByIdForUpdateAsync(bookingId, ct);
+
+        if (booking is null)
+            return Result<BookingResponse>.NotFound("ההזמנה לא נמצאה.");
+
+        if (!isAdmin && booking.UserId != userId)
+            return Result<BookingResponse>.Forbidden("אין הרשאה לעדכן הזמנה זו.");
+
+        if (booking.Status == BookingStatus.Cancelled)
+            return Result<BookingResponse>.Conflict("לא ניתן לעדכן הזמנה שבוטלה.");
+
+        // 2. חלון העדכון — כמו בביטול
+        var firstDeparture = booking.BookingFlights
+            .Select(bf => (DateTime?)bf.Flight.DepartureTime)
+            .Min();
+
+        if (firstDeparture is null)
+            return Result<BookingResponse>.BadRequest("לא נמצאה טיסה עבור ההזמנה.");
+
+        if ((firstDeparture.Value - DateTime.UtcNow).TotalHours < 24)
+            return Result<BookingResponse>.Conflict(
+                "לא ניתן לעדכן הזמנה בפחות מ-24 שעות לפני ההמראה.");
+
+        var flightId = booking.BookingFlights
+            .OrderBy(bf => bf.SegmentOrder)
+            .First().FlightId;
+
+        // 3. טעינת כל מושבי הטיסה — לבדיקת זמינות
+        var flightSeats = await _bookings.GetSeatsByFlightAsync(flightId, ct);
+        var seatsById = flightSeats.ToDictionary(s => s.Id);
+
+        var oldSeats = booking.Seats.ToList();
+        var oldSeatIds = oldSeats.Select(s => s.Id).ToList();
+        var newSeats = new List<Seat>();
+
+        foreach (var seatId in request.SeatIds)
+        {
+            if (!seatsById.TryGetValue(seatId, out var seat))
+                return Result<BookingResponse>.BadRequest(
+                    $"המושב {seatId} אינו שייך לטיסה זו.");
+
+            // מושב שכבר שייך להזמנה הזו — נשאר, לא נחשב תפוס
+            if (oldSeatIds.Contains(seatId))
+            {
+                newSeats.Add(seat);
+                continue;
+            }
+
+            if (seat.Status != SeatStatus.Available)
+                return Result<BookingResponse>.Conflict(
+                    $"המושב {seat.SeatNumber} אינו פנוי.");
+
+            newSeats.Add(seat);
+        }
+
+        // 4. שחרור המושבים שהוסרו
+        foreach (var seat in oldSeats.Where(s => !request.SeatIds.Contains(s.Id)))
+        {
+            seat.Status = SeatStatus.Available;
+            seat.BookingId = null;
+            seat.BookedAt = null;
+            booking.Seats.Remove(seat);
+        }
+
+        // 5. תפיסת המושבים החדשים
+        var now = DateTime.UtcNow;
+        foreach (var seat in newSeats.Where(s => !oldSeatIds.Contains(s.Id)))
+        {
+            seat.Status = SeatStatus.Booked;
+            seat.BookingId = booking.Id;
+            seat.BookedAt = now;
+            booking.Seats.Add(seat);
+        }
+
+        // 6. עדכון פרטים
+        booking.PassengerFullName = request.PassengerFullName.Trim();
+        booking.PassportNumber = request.PassportNumber.Trim();
+        booking.MealType = (MealType)request.MealType;
+        booking.KashrutLevel = (KashrutLevel)request.KashrutLevel;
+        booking.SpecialRequests = request.SpecialRequests;
+
+        // 7. שמירה — כאן מתפוצצת תחרות על המושב
+        try
+        {
+            await _bookings.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            _logger.LogWarning(ex,
+                "התנגשות בעדכון הזמנה {BookingReference} — מושב נתפס בינתיים.",
+                booking.BookingReference);
+
+            return Result<BookingResponse>.Conflict(
+                "אחד המושבים נתפס על ידי משתמש אחר. נסי שוב.");
+        }
+
+        _logger.LogInformation(
+            "הזמנה {BookingReference} עודכנה על ידי משתמש {UserId}. מושבים: {SeatCount}.",
+            booking.BookingReference, userId, booking.Seats.Count);
+
+        return Result<BookingResponse>.Ok(MapDetails(booking));
+    }
 }

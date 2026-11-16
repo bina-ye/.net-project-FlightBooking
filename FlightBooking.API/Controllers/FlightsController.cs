@@ -93,4 +93,30 @@ public class FlightsController : ControllerBase
             _ => BadRequest(new { message = result.ErrorMessage })
         };
     }
+   
+
+    /// <summary>קטלוג כל הטיסות, עם סינון אופציונלי. includePast זמין למנהל בלבד.</summary>
+    [HttpGet("catalog")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(PagedResult<FlightResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetCatalog(
+        [FromQuery] FlightCatalogRequest request, CancellationToken ct)
+    {
+        if (!ModelState.IsValid)
+            return ValidationProblem(ModelState);
+
+        if (request.IncludePast &&
+            !(User.Identity?.IsAuthenticated == true && User.IsInRole("Admin")))
+        {
+            request.IncludePast = false;
+        }
+
+        var result = await _flights.GetCatalogAsync(request, ct);
+
+        return result.Status switch
+        {
+            ResultStatus.Ok => Ok(result.Value),
+            _ => BadRequest(new { message = result.ErrorMessage })
+        };
+    }
 }

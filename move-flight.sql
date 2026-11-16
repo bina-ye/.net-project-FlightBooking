@@ -1,0 +1,1 @@
+UPDATE "Flights" SET "DepartureTime" = NOW() + INTERVAL '5 hours' WHERE "Id" = 9;

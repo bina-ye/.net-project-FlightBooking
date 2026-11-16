@@ -10,6 +10,16 @@ public interface IFlightService
         FlightSearchRequest request,
         CancellationToken ct = default);
 
+    Task<Result<PagedResult<FlightResponse>>> GetCatalogAsync(
+        FlightCatalogRequest request,
+        CancellationToken ct = default);
+
+    Task<Result<PagedResult<FlightResponse>>> GetCatalogAsync(
+        int pageNumber,
+        int pageSize,
+        bool includePast = false,
+        CancellationToken ct = default);
+
     Task<Result<FlightResponse>> GetByIdAsync(int id, CancellationToken ct = default);
     Task<Result<FlightResponse>> CreateAsync(FlightCreateRequest request, CancellationToken ct = default);
     Task<Result<IReadOnlyList<SeatResponse>>> GetSeatsAsync(

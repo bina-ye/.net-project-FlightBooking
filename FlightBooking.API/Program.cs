@@ -3,15 +3,17 @@ using FlightBooking.Core.Interfaces;
 using FlightBooking.Data.Context;
 using FlightBooking.Data.Repositories;
 using FlightBooking.Data.Seed;
+using FlightBooking.Service.Mapping;
 using FlightBooking.Service.Payment;
 using FlightBooking.Service.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using System.Text;
 using NLog.Web;
-
+using System.Text;
+//using AutoMapper;
 
 var builder = WebApplication.CreateBuilder(args);
 // ---------- NLog ----------
@@ -33,7 +35,10 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IPaymentService, MockPaymentService>();
 builder.Services.AddSingleton<ITokenService, TokenService>();
-
+builder.Services.AddAutoMapper(cfg =>
+{
+    cfg.AddProfile<MappingProfile>();
+});
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 
 // ---------- JWT ----------

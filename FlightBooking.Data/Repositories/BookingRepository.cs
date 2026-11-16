@@ -35,6 +35,26 @@ public class BookingRepository : IBookingRepository
             .FirstOrDefaultAsync(b => b.Id == id, ct);
     }
 
+    public async Task<Booking?> GetByIdForUpdateAsync(int id, CancellationToken ct = default)
+    {
+        return await _context.Bookings
+            .Include(b => b.Seats)
+            .Include(b => b.BookingFlights)
+                .ThenInclude(bf => bf.Flight)
+                    .ThenInclude(f => f.OriginAirport)
+            .Include(b => b.BookingFlights)
+                .ThenInclude(bf => bf.Flight)
+                    .ThenInclude(f => f.DestinationAirport)
+            .FirstOrDefaultAsync(b => b.Id == id, ct);
+    }
+    public async Task<IReadOnlyList<Seat>> GetSeatsByFlightAsync(
+    int flightId, CancellationToken ct = default)
+    {
+        // tracked — כדי שנוכל לשנות סטטוס ולשמור באותה יחידת עבודה
+        return await _context.Seats
+            .Where(s => s.FlightId == flightId)
+            .ToListAsync(ct);
+    }
     public async Task<(IReadOnlyList<Booking> Items, int TotalCount)> GetByUserAsync(
         int userId,
         int pageNumber,
@@ -75,4 +95,5 @@ public class BookingRepository : IBookingRepository
     {
         await _context.SaveChangesAsync(ct);
     }
+
 }

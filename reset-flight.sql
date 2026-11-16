@@ -1,0 +1,1 @@
+UPDATE "Flights" SET "DepartureTime" = '2026-12-20 08:00:00+00' WHERE "Id" = 9;

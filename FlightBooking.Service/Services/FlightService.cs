@@ -5,8 +5,8 @@ using FlightBooking.Core.Entities;
 using FlightBooking.Core.Enums;
 using FlightBooking.Core.Interfaces;
 using FlightBooking.Core.Seats;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using AutoMapper;
 
 namespace FlightBooking.Service.Services;
 
@@ -16,17 +16,79 @@ public class FlightService : IFlightService
 
     private readonly IFlightRepository _flights;
     private readonly ILogger<FlightService> _logger;
+    private readonly IMapper _mapper;
 
-    public FlightService(IFlightRepository flights, ILogger<FlightService> logger)
+    public FlightService(IFlightRepository flights, ILogger<FlightService> logger, IMapper mapper)
     {
         _flights = flights;
         _logger = logger;
+        _mapper = mapper;
+
     }
+
+    // ── קטלוג ────────────────────────────────────────────────────────────
+
+    /// <summary>דריסה תואמת לאחור — עימוד בלבד, בלי סינון.</summary>
+    public Task<Result<PagedResult<FlightResponse>>> GetCatalogAsync(
+        int pageNumber, int pageSize, bool includePast = false,
+        CancellationToken ct = default)
+        => GetCatalogAsync(
+            new FlightCatalogRequest
+            {
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                IncludePast = includePast
+            },
+            ct);
+
+    /// <summary>קטלוג עם סינון אופציונלי לפי מוצא, יעד וטווח תאריכים.</summary>
+    public async Task<Result<PagedResult<FlightResponse>>> GetCatalogAsync(
+        FlightCatalogRequest request, CancellationToken ct = default)
+    {
+        var pageNumber = Math.Max(1, request.PageNumber);
+        var pageSize = Math.Clamp(request.PageSize, 1, MaxPageSize);
+
+        var origin = NormalizeCode(request.OriginCode);
+        var destination = NormalizeCode(request.DestinationCode);
+
+        if (request.FromDate.HasValue && request.ToDate.HasValue
+            && request.ToDate.Value < request.FromDate.Value)
+        {
+            return Result<PagedResult<FlightResponse>>.BadRequest(
+                "תאריך הסיום לא יכול להיות לפני תאריך ההתחלה.");
+        }
+
+        if (origin is not null && destination is not null && origin == destination)
+        {
+            return Result<PagedResult<FlightResponse>>.BadRequest(
+                "נמל המוצא ונמל היעד חייבים להיות שונים.");
+        }
+
+        var (items, totalCount) = await _flights.GetCatalogAsync(
+            new FlightCatalogQuery
+            {
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                IncludePast = request.IncludePast,
+                OriginCode = origin,
+                DestinationCode = destination,
+                FromDate = request.FromDate,
+                ToDate = request.ToDate
+            },
+            ct);
+
+        var mapped = _mapper.Map<List<FlightResponse>>(items);
+
+        return Result<PagedResult<FlightResponse>>.Ok(new PagedResult<FlightResponse>(
+            mapped, pageNumber, pageSize, totalCount));
+    }
+
+    // ── חיפוש ────────────────────────────────────────────────────────────
 
     public async Task<Result<PagedResult<FlightResponse>>> SearchAsync(
         FlightSearchRequest request, CancellationToken ct = default)
     {
-        // ולידציה עסקית — לא תלוית נתונים אבל לא שייכת ל-Controller
+        // ולידציה עסקית — לא תלוית נתונים, אבל לא שייכת ל-Controller
         if (request.ReturnDate.HasValue && request.ReturnDate.Value < request.DepartureDate)
         {
             return Result<PagedResult<FlightResponse>>.BadRequest(
@@ -48,16 +110,19 @@ public class FlightService : IFlightService
         var (items, totalCount) = await _flights.SearchAsync(
             origin,
             destination,
-    DateTime.SpecifyKind(request.DepartureDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc),
+            DateTime.SpecifyKind(
+                request.DepartureDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc),
             pageNumber,
             pageSize,
             ct);
 
-        var mapped = items.Select(MapFlight).ToList();
+        var mapped = _mapper.Map<List<FlightResponse>>(items);
 
         return Result<PagedResult<FlightResponse>>.Ok(new PagedResult<FlightResponse>(
             mapped, pageNumber, pageSize, totalCount));
     }
+
+    // ── שאילתות בודדות ───────────────────────────────────────────────────
 
     public async Task<Result<FlightResponse>> GetByIdAsync(int id, CancellationToken ct = default)
     {
@@ -67,8 +132,7 @@ public class FlightService : IFlightService
         {
             return Result<FlightResponse>.NotFound("הטיסה לא נמצאה.");
         }
-
-        return Result<FlightResponse>.Ok(MapFlight(flight));
+        return Result<FlightResponse>.Ok(_mapper.Map<FlightResponse>(flight));
     }
 
     public async Task<Result<IReadOnlyList<SeatResponse>>> GetSeatsAsync(
@@ -98,26 +162,10 @@ public class FlightService : IFlightService
         return Result<IReadOnlyList<SeatResponse>>.Ok(response);
     }
 
-    private static FlightResponse MapFlight(Flight flight) => new()
-    {
-        Id = flight.Id,
-        FlightNumber = flight.FlightNumber,
-        OriginCode = flight.OriginAirport.Code,
-        OriginCity = flight.OriginAirport.City,
-        DestinationCode = flight.DestinationAirport.Code,
-        DestinationCity = flight.DestinationAirport.City,
-        DepartureTime = flight.DepartureTime,
-        ArrivalTime = flight.ArrivalTime,
-        CheckInOpensAt = flight.CheckInOpensAt,
-        BoardingTime = flight.BoardingTime,
-        Gate = flight.Gate,
-        Price = flight.Price,
-        AircraftType = flight.AircraftType,
-        AvailableSeatsCount = flight.Seats.Count(s => s.Status == SeatStatus.Available)
-    };
+    // ── יצירה ────────────────────────────────────────────────────────────
 
     public async Task<Result<FlightResponse>> CreateAsync(
-    FlightCreateRequest request, CancellationToken ct = default)
+        FlightCreateRequest request, CancellationToken ct = default)
     {
         var originCode = request.OriginCode.Trim().ToUpperInvariant();
         var destinationCode = request.DestinationCode.Trim().ToUpperInvariant();
@@ -181,7 +229,29 @@ public class FlightService : IFlightService
         // שדות התעופה נדרשים למיפוי — הם לא נטענים אוטומטית
         flight.OriginAirport = origin;
         flight.DestinationAirport = destination;
-
-        return Result<FlightResponse>.Created(MapFlight(flight));
+        return Result<FlightResponse>.Created(_mapper.Map<FlightResponse>(flight));
     }
+
+    // ── עזר ──────────────────────────────────────────────────────────────
+
+    private static string? NormalizeCode(string? code) =>
+        string.IsNullOrWhiteSpace(code) ? null : code.Trim().ToUpperInvariant();
+
+    //private static FlightResponse MapFlight(Flight flight) => new()
+    //{
+    //    Id = flight.Id,
+    //    FlightNumber = flight.FlightNumber,
+    //    OriginCode = flight.OriginAirport.Code,
+    //    OriginCity = flight.OriginAirport.City,
+    //    DestinationCode = flight.DestinationAirport.Code,
+    //    DestinationCity = flight.DestinationAirport.City,
+    //    DepartureTime = flight.DepartureTime,
+    //    ArrivalTime = flight.ArrivalTime,
+    //    CheckInOpensAt = flight.CheckInOpensAt,
+    //    BoardingTime = flight.BoardingTime,
+    //    Gate = flight.Gate,
+    //    Price = flight.Price,
+    //    AircraftType = flight.AircraftType,
+    //    AvailableSeatsCount = flight.Seats.Count(s => s.Status == SeatStatus.Available)
+    //};
 }

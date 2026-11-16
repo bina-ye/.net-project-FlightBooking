@@ -19,3 +19,5 @@ appsettings.Development.json
 # OS
 Thumbs.db
 .DS_Store
+*.local.json
+appsettings.*.local.json

@@ -19,6 +19,8 @@ public class Booking
     public BookingStatus Status { get; set; } = BookingStatus.Pending;
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? CancelledAt { get; set; }
+
     public decimal TotalAmount { get; set; }
 
     // פרטי הנוסע
@@ -32,4 +34,5 @@ public class Booking
 
     public ICollection<Seat> Seats { get; set; } = new List<Seat>();
     public ICollection<BookingFlight> BookingFlights { get; set; } = new List<BookingFlight>();
+ 
 }

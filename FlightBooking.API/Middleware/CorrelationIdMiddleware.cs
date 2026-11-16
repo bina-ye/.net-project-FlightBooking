@@ -19,14 +19,20 @@ public class CorrelationIdMiddleware
         if (string.IsNullOrWhiteSpace(correlationId))
             correlationId = Guid.NewGuid().ToString("N");
 
+
         context.Items[HeaderName] = correlationId;
+        context.Request.Headers[HeaderName] = correlationId;
         context.Response.Headers[HeaderName] = correlationId;
 
         using (_logger.BeginScope(new Dictionary<string, object> { ["CorrelationId"] = correlationId }))
         {
-            _logger.LogInformation("Incoming {Method} {Path}", context.Request.Method, context.Request.Path);
+            _logger.LogInformation("Incoming {Method} {Path} corr={CorrelationId}",
+     context.Request.Method, context.Request.Path, correlationId);
+
             await _next(context);
-            _logger.LogInformation("Completed {StatusCode}", context.Response.StatusCode);
+
+            _logger.LogInformation("Completed {StatusCode} corr={CorrelationId}",
+                context.Response.StatusCode, correlationId);
         }
     }
 }
