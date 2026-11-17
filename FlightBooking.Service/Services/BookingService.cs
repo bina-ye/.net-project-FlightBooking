@@ -267,10 +267,9 @@ public class BookingService : IBookingService
                 SegmentOrder = bf.SegmentOrder
             }).ToList()
     };
-  
 
     public async Task<Result<BookingResponse>> CancelAsync(
-    int bookingId, int userId, bool isAdmin, CancellationToken ct = default)
+        int bookingId, int userId, bool isAdmin, CancellationToken ct = default)
     {
         var booking = await _bookings.GetByIdForUpdateAsync(bookingId, ct);
 
@@ -335,18 +334,20 @@ public class BookingService : IBookingService
             TotalAmount = booking.TotalAmount
         });
     }
+
     public async Task<Result<BookingResponse>> UpdateAsync(
-    int bookingId,
-    int userId,
-    bool isAdmin,
-    BookingUpdateRequest request,
-    CancellationToken ct = default)
+        int bookingId,
+        int userId,
+        bool isAdmin,
+        BookingUpdateRequest request,
+        CancellationToken ct = default)
     {
         if (request.SeatIds.Count == 0)
             return Result<BookingResponse>.BadRequest("יש לבחור לפחות מושב אחד.");
 
         if (request.SeatIds.Distinct().Count() != request.SeatIds.Count)
             return Result<BookingResponse>.BadRequest("נבחר אותו מושב יותר מפעם אחת.");
+
 
         // 1. טעינה עם tracking — אנחנו עומדים לשנות
         var booking = await _bookings.GetByIdForUpdateAsync(bookingId, ct);
@@ -359,6 +360,10 @@ public class BookingService : IBookingService
 
         if (booking.Status == BookingStatus.Cancelled)
             return Result<BookingResponse>.Conflict("לא ניתן לעדכן הזמנה שבוטלה.");
+        // מספר המושבים הסופי חייב להיות זהה למספר המקורי
+        if (request.SeatIds.Count != booking.Seats.Count)
+            return Result<BookingResponse>.BadRequest(
+                $"יש לבחור בדיוק {booking.Seats.Count} מושבים — כמספר המושבים בהזמנה.");
 
         // 2. חלון העדכון — כמו בביטול
         var firstDeparture = booking.BookingFlights
@@ -405,12 +410,13 @@ public class BookingService : IBookingService
         }
 
         // 4. שחרור המושבים שהוסרו
+        // מעדכנים את ה-FK (Seat.BookingId) בלבד — EF יוציא UPDATE.
+        // אין צורך לגעת בקולקשן booking.Seats.
         foreach (var seat in oldSeats.Where(s => !request.SeatIds.Contains(s.Id)))
         {
             seat.Status = SeatStatus.Available;
             seat.BookingId = null;
             seat.BookedAt = null;
-            booking.Seats.Remove(seat);
         }
 
         // 5. תפיסת המושבים החדשים
@@ -420,7 +426,6 @@ public class BookingService : IBookingService
             seat.Status = SeatStatus.Booked;
             seat.BookingId = booking.Id;
             seat.BookedAt = now;
-            booking.Seats.Add(seat);
         }
 
         // 6. עדכון פרטים
@@ -447,8 +452,15 @@ public class BookingService : IBookingService
 
         _logger.LogInformation(
             "הזמנה {BookingReference} עודכנה על ידי משתמש {UserId}. מושבים: {SeatCount}.",
-            booking.BookingReference, userId, booking.Seats.Count);
+            booking.BookingReference, userId, request.SeatIds.Count);
 
-        return Result<BookingResponse>.Ok(MapDetails(booking));
+        // 8. טעינה מחדש — כדי שהתשובה תשקף את מצב המסד ולא את
+        // קולקשן booking.Seats בזיכרון, שלא עודכן ידנית.
+        var updated = await _bookings.GetByIdWithDetailsAsync(booking.Id, ct);
+
+        if (updated is null)
+            return Result<BookingResponse>.NotFound("ההזמנה לא נמצאה.");
+
+        return Result<BookingResponse>.Ok(MapDetails(updated));
     }
 }
