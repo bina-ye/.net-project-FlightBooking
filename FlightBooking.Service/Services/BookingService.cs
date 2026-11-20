@@ -30,6 +30,109 @@ public class BookingService : IBookingService
         _logger = logger;
     }
 
+    //public async Task<Result<BookingResponse>> CreateAsync(
+    //    int userId, BookingCreateRequest request, CancellationToken ct = default)
+    //{
+    //    if (request.SeatIds.Count == 0)
+    //        return Result<BookingResponse>.BadRequest("יש לבחור לפחות מושב אחד.");
+
+    //    if (request.SeatIds.Distinct().Count() != request.SeatIds.Count)
+    //        return Result<BookingResponse>.BadRequest("נבחר אותו מושב יותר מפעם אחת.");
+
+    //    // 1. טעינת המושבים — כאן מתחילה התחרות
+    //    var seats = new List<Seat>();
+    //    foreach (var seatId in request.SeatIds)
+    //    {
+    //        var seat = await _flights.GetSeatWithFlightAsync(seatId, ct);
+
+    //        if (seat is null)
+    //            return Result<BookingResponse>.NotFound($"המושב {seatId} לא נמצא.");
+
+    //        // ולידציה עסקית: הטיסה כבר המריאה
+    //        if (seat.Flight.DepartureTime <= DateTime.UtcNow)
+    //            return Result<BookingResponse>.BadRequest(
+    //                $"לא ניתן להזמין מושב בטיסה {seat.Flight.FlightNumber} — הטיסה כבר המריאה.");
+
+    //        // ולידציה עסקית: המושב כבר תפוס
+    //        if (seat.Status != SeatStatus.Available)
+    //            return Result<BookingResponse>.Conflict(
+    //                $"המושב {seat.SeatNumber} אינו פנוי.");
+
+    //        seats.Add(seat);
+    //    }
+
+    //    // 2. כל המושבים חייבים להיות באותה טיסה
+    //    if (seats.Select(s => s.FlightId).Distinct().Count() > 1)
+    //        return Result<BookingResponse>.BadRequest("יש לבחור מושבים באותה טיסה.");
+
+    //    var flight = seats[0].Flight;
+    //    var totalAmount = flight.Price * seats.Count;
+
+    //    // 3. תשלום — לפני תפיסת המושבים
+    //    var payment = await _payments.ChargeAsync(
+    //        totalAmount,
+    //        request.Payment.CardNumber,
+    //        request.Payment.Expiry,
+    //        request.Payment.Cvv,
+    //        ct);
+
+    //    if (!payment.IsSuccess)
+    //        return Result<BookingResponse>.BadRequest(
+    //            payment.ErrorMessage ?? "התשלום נכשל.");
+
+    //    // 4. יצירת ההזמנה
+    //    var booking = new Booking
+    //    {
+    //        UserId = userId,
+    //        BookingReference = await GenerateReferenceAsync(ct),
+    //        Status = BookingStatus.Confirmed,
+    //        CreatedAt = DateTime.UtcNow,
+    //        TotalAmount = totalAmount,
+    //        PassengerFullName = request.PassengerFullName.Trim(),
+    //        PassportNumber = request.PassportNumber.Trim(),
+    //        MealType = (MealType)request.MealType,
+    //        KashrutLevel = (KashrutLevel)request.KashrutLevel,
+    //        SpecialRequests = request.SpecialRequests
+    //    };
+
+    //    booking.BookingFlights.Add(new BookingFlight
+    //    {
+    //        FlightId = flight.Id,
+    //        SegmentOrder = 1
+    //    });
+
+    //    foreach (var seat in seats)
+    //    {
+    //        seat.Status = SeatStatus.Booked;
+    //        seat.BookedAt = DateTime.UtcNow;
+    //        booking.Seats.Add(seat);
+    //    }
+
+    //    await _bookings.AddAsync(booking, ct);
+
+    //    // 5. השמירה — כאן מתפוצצת התחרות
+    //    try
+    //    {
+    //        await _bookings.SaveChangesAsync(ct);
+    //    }
+    //    catch (DbUpdateConcurrencyException ex)
+    //    {
+    //        _logger.LogWarning(ex,
+    //            "התנגשות על מושבים בטיסה {FlightId}. מישהו אחר תפס אותם קודם. תשלום {TransactionId} דורש החזר.",
+    //            flight.Id, payment.TransactionId);
+
+    //        // במערכת אמיתית: await _payments.RefundAsync(payment.TransactionId, ct);
+    //        // במימוש המדומה אין חיוב אמיתי, ולכן נרשם לוג בלבד.
+
+    //        return Result<BookingResponse>.Conflict(
+    //            "המושב נתפס על ידי משתמש אחר. נסי שוב.");
+    //    }
+    //    _logger.LogInformation(
+    //        "הזמנה {BookingReference} נוצרה עבור משתמש {UserId} בסכום {Amount}.",
+    //        booking.BookingReference, userId, booking.TotalAmount);
+
+    //    return Result<BookingResponse>.Created(MapBooking(booking, flight));
+    //}
     public async Task<Result<BookingResponse>> CreateAsync(
         int userId, BookingCreateRequest request, CancellationToken ct = default)
     {
@@ -39,7 +142,7 @@ public class BookingService : IBookingService
         if (request.SeatIds.Distinct().Count() != request.SeatIds.Count)
             return Result<BookingResponse>.BadRequest("נבחר אותו מושב יותר מפעם אחת.");
 
-        // 1. טעינת המושבים — כאן מתחילה התחרות
+        // ===== 1. טעינת המושבים — כאן מתחילה התחרות =====
         var seats = new List<Seat>();
         foreach (var seatId in request.SeatIds)
         {
@@ -68,19 +171,7 @@ public class BookingService : IBookingService
         var flight = seats[0].Flight;
         var totalAmount = flight.Price * seats.Count;
 
-        // 3. תשלום — לפני תפיסת המושבים
-        var payment = await _payments.ChargeAsync(
-            totalAmount,
-            request.Payment.CardNumber,
-            request.Payment.Expiry,
-            request.Payment.Cvv,
-            ct);
-
-        if (!payment.IsSuccess)
-            return Result<BookingResponse>.BadRequest(
-                payment.ErrorMessage ?? "התשלום נכשל.");
-
-        // 4. יצירת ההזמנה
+        // ===== 2. יצירת ההזמנה ותפיסת המושבים — לפני התשלום =====
         var booking = new Booking
         {
             UserId = userId,
@@ -110,7 +201,8 @@ public class BookingService : IBookingService
 
         await _bookings.AddAsync(booking, ct);
 
-        // 5. השמירה — כאן מתפוצצת התחרות
+        // ===== 3. השמירה — כאן מכריע ה-xmin מי המנצח =====
+        // מי שמגיע לכאן שני — לא ממשיך הלאה, ולכן לא מחויב.
         try
         {
             await _bookings.SaveChangesAsync(ct);
@@ -118,22 +210,60 @@ public class BookingService : IBookingService
         catch (DbUpdateConcurrencyException ex)
         {
             _logger.LogWarning(ex,
-                "התנגשות על מושבים בטיסה {FlightId}. מישהו אחר תפס אותם קודם. תשלום {TransactionId} דורש החזר.",
-                flight.Id, payment.TransactionId);
-
-            // במערכת אמיתית: await _payments.RefundAsync(payment.TransactionId, ct);
-            // במימוש המדומה אין חיוב אמיתי, ולכן נרשם לוג בלבד.
+                "התנגשות על מושבים בטיסה {FlightId}. משתמש {UserId} לא קיבל את המושבים.",
+                flight.Id, userId);
 
             return Result<BookingResponse>.Conflict(
                 "המושב נתפס על ידי משתמש אחר. נסי שוב.");
         }
+
+        // ===== 4. תשלום — רק למי שתפס את המושבים בפועל =====
+        var payment = await _payments.ChargeAsync(
+            totalAmount,
+            request.Payment.CardNumber,
+            request.Payment.Expiry,
+            request.Payment.Cvv,
+            ct);
+
+        if (!payment.IsSuccess)
+        {
+            // התשלום נכשל אחרי שהמושב נתפס — משחררים אותו חזרה לבריכה
+            foreach (var seat in seats)
+            {
+                seat.Status = SeatStatus.Available;
+                seat.BookedAt = null;
+                seat.BookingId = null;
+            }
+
+            booking.Status = BookingStatus.Cancelled;
+            booking.CancelledAt = DateTime.UtcNow;
+
+            try
+            {
+                await _bookings.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                // לא קריטי: המושב יישאר תפוס, אבל הכסף לא נלקח
+                _logger.LogError(ex,
+                    "כשל בשחרור מושבים לאחר תשלום כושל. הזמנה {BookingReference}.",
+                    booking.BookingReference);
+            }
+
+            _logger.LogWarning(
+                "תשלום נכשל עבור משתמש {UserId}. הזמנה {BookingReference} בוטלה והמושבים שוחררו.",
+                userId, booking.BookingReference);
+
+            return Result<BookingResponse>.BadRequest(
+                payment.ErrorMessage ?? "התשלום נכשל.");
+        }
+
         _logger.LogInformation(
-            "הזמנה {BookingReference} נוצרה עבור משתמש {UserId} בסכום {Amount}.",
-            booking.BookingReference, userId, booking.TotalAmount);
+            "הזמנה {BookingReference} נוצרה עבור משתמש {UserId} בסכום {Amount}. עסקה {TransactionId}.",
+            booking.BookingReference, userId, booking.TotalAmount, payment.TransactionId);
 
         return Result<BookingResponse>.Created(MapBooking(booking, flight));
     }
-
     public async Task<Result<BookingResponse>> GetByIdAsync(
         int bookingId, int userId, bool isAdmin, CancellationToken ct = default)
     {
