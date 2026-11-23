@@ -77,6 +77,26 @@ public static class DbSeeder
                 Role = UserRole.Customer
             });
 
+        //var adminEmail = Environment.GetEnvironmentVariable("ADMIN_EMAIL");
+        //var adminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD");
+
+        //context.Users.AddRange(
+        //    new AppUser
+        //    {
+        //        Email = string.IsNullOrWhiteSpace(adminEmail) ? "admin@flightbooking.local" : adminEmail,
+        //        FullName = "מנהל המערכת",
+        //        PasswordHash = BCrypt.Net.BCrypt.HashPassword(
+        //            string.IsNullOrWhiteSpace(adminPassword) ? "Password123!" : adminPassword),
+        //        Role = UserRole.Admin
+        //    },
+        //    new AppUser
+        //    {
+        //        Email = "customer@flightbooking.local",
+        //        FullName = "לקוח לדוגמה",
+        //        PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password123!"),
+        //        Role = UserRole.Customer
+        //    });
+
         await context.SaveChangesAsync(ct);
     }
 
