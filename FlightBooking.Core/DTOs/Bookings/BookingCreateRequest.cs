@@ -23,8 +23,12 @@ public class BookingCreateRequest
     [MaxLength(30)]
     public string PassportNumber { get; set; } = string.Empty;
 
+    // 0–4 לפי MealType
+    [Range(0, 4, ErrorMessage = "סוג ארוחה אינו תקין")]
     public int MealType { get; set; }
 
+    // 0–3 לפי KashrutLevel
+    [Range(0, 3, ErrorMessage = "רמת כשרות אינו תקינה")]
     public int KashrutLevel { get; set; }
 
     [MaxLength(500)]
