@@ -83,12 +83,12 @@ dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Po
 dotnet user-secrets set "Jwt:Key" "<מפתח-בן-64-תוים>" --project FlightBooking.API
 dotnet user-secrets set "Jwt:Issuer" "FlightBooking" --project FlightBooking.API
 dotnet user-secrets set "Jwt:Audience" "FlightBooking.Client" --project FlightBooking.API
-dotnet user-secrets set "Seed:AdminPassword" "<סיסמת-מנהל-חזקה>" --project FlightBooking.API
-dotnet user-secrets set "Seed:CustomerPassword" "<סיסמת-לקוח>" --project FlightBooking.API
 ```
 
-סיסמאות משתמשי הדמו אינן כתובות בקוד. השרת לא יעלה אם `Seed:AdminPassword`
-או `Seed:CustomerPassword` חסרים.
+נתוני הדמו של משתמשים נוצרים ב-seed. ניתן להחליף את המיילים והסיסמאות דרך
+המפתחות `Seed:AdminEmail`, `Seed:AdminPassword`, `Seed:CustomerEmail`,
+`Seed:CustomerPassword`. אם לא הוגדרה סיסמה, ברירת המחדל היא סיסמת הדמו
+שבטבלת משתמשי הדמו.
 
 ### הפעלה
 
@@ -128,12 +128,13 @@ dotnet test
 
 ## משתמשי דמו
 
-| תפקיד | אימייל ברירת מחדל | סיסמה |
+| תפקיד | אימייל | סיסמה |
 |---|---|---|
-| מנהל | admin@flightbooking.local | `Seed:AdminPassword` |
-| לקוח | customer@flightbooking.local | `Seed:CustomerPassword` |
+| מנהל | admin@flightbooking.local | Password123! |
+| לקוח | customer@flightbooking.local | Password123! |
 
-כתובות האימייל ניתנות לשינוי דרך `Seed:AdminEmail` ו-`Seed:CustomerEmail`.
+בפריסה מומלץ לעקוף את ברירת המחדל דרך משתני הסביבה `Seed__AdminPassword`
+ו-`Seed__CustomerPassword`.
 
 ---
 
@@ -247,8 +248,8 @@ NLog מוגדר ב-`nlog.config` (נטען אוטומטית), והקוד משת�
 - `ConnectionStrings__DefaultConnection` — מחרוזת החיבור ל-PostgreSQL
 - `Jwt__Key` — מפתח החתימה של ה-JWT
 - `Jwt__Issuer`, `Jwt__Audience` — תואמים לערך שהוגדר בפיתוח
-- `Seed__AdminPassword` — סיסמת מנהל הדמו (חובה)
-- `Seed__CustomerPassword` — סיסמת לקוח הדמו (חובה)
+- `Seed__AdminPassword` — סיסמת מנהל (אופציונלי; ברירת מחדל: סיסמת הדמו)
+- `Seed__CustomerPassword` — סיסמת לקוח (אופציונלי; ברירת מחדל: סיסמת הדמו)
 - `Seed__AdminEmail` — אימייל המנהל (אופציונלי)
 - `ASPNETCORE_ENVIRONMENT` — `Production`
 

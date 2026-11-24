@@ -43,18 +43,9 @@ builder.Services.AddAutoMapper(cfg =>
 });
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 
-// משתמשי הדמו — הסיסמאות מגיעות מקונפיגורציה (User Secrets / משתני סביבה),
-// לא מקוד המקור.
+// משתמשי הדמו — המיילים והסיסמאות ניתנים להגדרה דרך קונפיגורציה.
+// אם לא הוגדרה סיסמה, נופלים חזרה לברירת המחדל של הנתונים לדוגמה.
 builder.Services.Configure<SeedOptions>(builder.Configuration.GetSection("Seed"));
-var seedSettings = builder.Configuration.GetSection("Seed");
-if (string.IsNullOrWhiteSpace(seedSettings["AdminPassword"]) ||
-    string.IsNullOrWhiteSpace(seedSettings["CustomerPassword"]))
-{
-    throw new InvalidOperationException(
-        "Seed:AdminPassword and Seed:CustomerPassword are required. " +
-        "Set them via User Secrets locally or environment variables (Seed__AdminPassword, " +
-        "Seed__CustomerPassword) when deploying.");
-}
 
 // ---------- JWT ----------
 var jwtSection = builder.Configuration.GetSection("Jwt");

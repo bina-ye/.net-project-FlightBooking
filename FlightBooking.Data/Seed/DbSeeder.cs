@@ -68,14 +68,20 @@ public static class DbSeeder
             {
                 Email = options.AdminEmail,
                 FullName = "מנהל המערכת",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(options.AdminPassword),
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(
+                    string.IsNullOrWhiteSpace(options.AdminPassword)
+                        ? "Password123!"
+                        : options.AdminPassword),
                 Role = UserRole.Admin
             },
             new AppUser
             {
                 Email = options.CustomerEmail,
                 FullName = "לקוח לדוגמה",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(options.CustomerPassword),
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(
+                    string.IsNullOrWhiteSpace(options.CustomerPassword)
+                        ? "Password123!"
+                        : options.CustomerPassword),
                 Role = UserRole.Customer
             });
 
