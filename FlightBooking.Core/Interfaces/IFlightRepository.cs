@@ -8,8 +8,8 @@ public class FlightCatalogQuery
     public int PageNumber { get; init; } = 1;
     public int PageSize { get; init; } = 10;
     public bool IncludePast { get; init; }
-    public string? OriginCode { get; init; }
     public string? DestinationCode { get; init; }
+    public string? OriginCode { get; init; }
     public DateOnly? FromDate { get; init; }
     public DateOnly? ToDate { get; init; }
 }
