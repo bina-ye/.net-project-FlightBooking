@@ -73,19 +73,21 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddControllers();
 // ---------- CORS (לצד הלקוח בפיתוח) ----------
-const string ClientCorsPolicy = "ClientPolicy";
 
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy(ClientCorsPolicy, policy =>
+    const string ClientCorsPolicy = "ClientPolicy";
+
+    builder.Services.AddCors(options =>
     {
-        policy.WithOrigins(
-                "http://localhost:5500",     // Live Server
-                "http://127.0.0.1:5500")
-            .AllowAnyHeader()
-            .AllowAnyMethod();
+        options.AddPolicy(ClientCorsPolicy, policy =>
+        {
+            policy.WithOrigins(
+                    "http://localhost:5500",                 // Live Server
+                    "http://127.0.0.1:5500",
+                    "https://flyby.onrender.com")            // ← הלקוח ב-Render
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        });
     });
-});
 builder.Services.AddEndpointsApiExplorer();
 
 
