@@ -83,7 +83,7 @@ builder.Services.AddControllers();
             policy.WithOrigins(
                     "http://localhost:5500",                 // Live Server
                     "http://127.0.0.1:5500",
-                    "https://flyby.onrender.com")            // ← הלקוח ב-Render
+                    "https://flyby-18gb.onrender.com")            // ← הלקוח ב-Render
                 .AllowAnyHeader()
                 .AllowAnyMethod();
         });
