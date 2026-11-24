@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using NLog.Web;
@@ -41,6 +42,19 @@ builder.Services.AddAutoMapper(cfg =>
     cfg.AddProfile<MappingProfile>();
 });
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
+
+// משתמשי הדמו — הסיסמאות מגיעות מקונפיגורציה (User Secrets / משתני סביבה),
+// לא מקוד המקור.
+builder.Services.Configure<SeedOptions>(builder.Configuration.GetSection("Seed"));
+var seedSettings = builder.Configuration.GetSection("Seed");
+if (string.IsNullOrWhiteSpace(seedSettings["AdminPassword"]) ||
+    string.IsNullOrWhiteSpace(seedSettings["CustomerPassword"]))
+{
+    throw new InvalidOperationException(
+        "Seed:AdminPassword and Seed:CustomerPassword are required. " +
+        "Set them via User Secrets locally or environment variables (Seed__AdminPassword, " +
+        "Seed__CustomerPassword) when deploying.");
+}
 
 // ---------- JWT ----------
 var jwtSection = builder.Configuration.GetSection("Jwt");
@@ -118,7 +132,8 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<FlightBookingDbContext>();
-    await DbSeeder.SeedAsync(db);
+    var seedOptions = scope.ServiceProvider.GetRequiredService<IOptions<SeedOptions>>().Value;
+    await DbSeeder.SeedAsync(db, seedOptions, ct: default);
 }
 
 // Render מזריק PORT (ברירת מחדל 10000) — מאזינים לו על כל הממשקים

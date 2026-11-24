@@ -2,12 +2,14 @@
 using FlightBooking.Core.Enums;
 using FlightBooking.Data.Context;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace FlightBooking.Data.Seed;
 
 public static class DbSeeder
 {
-    public static async Task SeedAsync(FlightBookingDbContext context, CancellationToken ct = default)
+    public static async Task SeedAsync(
+        FlightBookingDbContext context, SeedOptions options, CancellationToken ct = default)
     {
         await context.Database.MigrateAsync(ct);
 
@@ -64,38 +66,18 @@ public static class DbSeeder
         context.Users.AddRange(
             new AppUser
             {
-                Email = "admin@flightbooking.local",
+                Email = options.AdminEmail,
                 FullName = "מנהל המערכת",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password123!"),
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(options.AdminPassword),
                 Role = UserRole.Admin
             },
             new AppUser
             {
-                Email = "customer@flightbooking.local",
+                Email = options.CustomerEmail,
                 FullName = "לקוח לדוגמה",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password123!"),
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(options.CustomerPassword),
                 Role = UserRole.Customer
             });
-
-        //var adminEmail = Environment.GetEnvironmentVariable("ADMIN_EMAIL");
-        //var adminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD");
-
-        //context.Users.AddRange(
-        //    new AppUser
-        //    {
-        //        Email = string.IsNullOrWhiteSpace(adminEmail) ? "admin@flightbooking.local" : adminEmail,
-        //        FullName = "מנהל המערכת",
-        //        PasswordHash = BCrypt.Net.BCrypt.HashPassword(
-        //            string.IsNullOrWhiteSpace(adminPassword) ? "Password123!" : adminPassword),
-        //        Role = UserRole.Admin
-        //    },
-        //    new AppUser
-        //    {
-        //        Email = "customer@flightbooking.local",
-        //        FullName = "לקוח לדוגמה",
-        //        PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password123!"),
-        //        Role = UserRole.Customer
-        //    });
 
         await context.SaveChangesAsync(ct);
     }

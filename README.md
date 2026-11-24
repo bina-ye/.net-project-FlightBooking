@@ -83,7 +83,12 @@ dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Po
 dotnet user-secrets set "Jwt:Key" "<מפתח-בן-64-תוים>" --project FlightBooking.API
 dotnet user-secrets set "Jwt:Issuer" "FlightBooking" --project FlightBooking.API
 dotnet user-secrets set "Jwt:Audience" "FlightBooking.Client" --project FlightBooking.API
+dotnet user-secrets set "Seed:AdminPassword" "<סיסמת-מנהל-חזקה>" --project FlightBooking.API
+dotnet user-secrets set "Seed:CustomerPassword" "<סיסמת-לקוח>" --project FlightBooking.API
 ```
+
+סיסמאות משתמשי הדמו אינן כתובות בקוד. השרת לא יעלה אם `Seed:AdminPassword`
+או `Seed:CustomerPassword` חסרים.
 
 ### הפעלה
 
@@ -123,10 +128,12 @@ dotnet test
 
 ## משתמשי דמו
 
-| תפקיד | אימייל | סיסמה |
+| תפקיד | אימייל ברירת מחדל | סיסמה |
 |---|---|---|
-| מנהל | admin@flightbooking.local | Password123! |
-| לקוח | customer@flightbooking.local | Password123! |
+| מנהל | admin@flightbooking.local | `Seed:AdminPassword` |
+| לקוח | customer@flightbooking.local | `Seed:CustomerPassword` |
+
+כתובות האימייל ניתנות לשינוי דרך `Seed:AdminEmail` ו-`Seed:CustomerEmail`.
 
 ---
 
@@ -239,6 +246,10 @@ NLog מוגדר ב-`nlog.config` (נטען אוטומטית), והקוד משת�
 
 - `ConnectionStrings__DefaultConnection` — מחרוזת החיבור ל-PostgreSQL
 - `Jwt__Key` — מפתח החתימה של ה-JWT
+- `Jwt__Issuer`, `Jwt__Audience` — תואמים לערך שהוגדר בפיתוח
+- `Seed__AdminPassword` — סיסמת מנהל הדמו (חובה)
+- `Seed__CustomerPassword` — סיסמת לקוח הדמו (חובה)
+- `Seed__AdminEmail` — אימייל המנהל (אופציונלי)
 - `ASPNETCORE_ENVIRONMENT` — `Production`
 
 ---
