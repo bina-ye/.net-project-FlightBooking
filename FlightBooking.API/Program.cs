@@ -147,6 +147,26 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+
+    // הגשת הלקוח הסטטי מהשרת עצמו בפיתוח: http://localhost:5069/index.html
+    // כך אין צורך ב-Live Server (שמרענן את הדף בכל שינוי קובץ) ואין בעיית CORS.
+    // bin/Debug/net9.0 → 5 רמות למעלה = תיקיית "project .net", ואז לתוך הלקוח.
+    // fix: שימוש מפורש בשם התיקייה כדי שלא תיווצר טעות בשם קבצים/תיקיות.
+    var clientPath = Path.GetFullPath(Path.Combine(
+        AppContext.BaseDirectory, "..", "..", "..", "..", "..", "FlightBooking.Client"));
+
+    if (Directory.Exists(clientPath))
+    {
+        var clientFileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(clientPath);
+
+        app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = clientFileProvider });
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            FileProvider = clientFileProvider,
+            OnPrepareResponse = ctx =>
+                ctx.Context.Response.Headers.CacheControl = "no-cache"
+        });
+    }
 }
 
 app.UseForwardedHeaders(new ForwardedHeadersOptions
