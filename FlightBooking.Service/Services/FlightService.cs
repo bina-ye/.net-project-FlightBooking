@@ -226,10 +226,10 @@ public class FlightService : IFlightService
             "Admin created flight {FlightNumber} with {SeatCount} seats (Id={FlightId})",
             flight.FlightNumber, flight.Seats.Count, flight.Id);
 
-        // שדות התעופה נדרשים למיפוי — הם לא נטענים אוטומטית
-        flight.OriginAirport = origin;
-        flight.DestinationAirport = destination;
-        return Result<FlightResponse>.Created(_mapper.Map<FlightResponse>(flight));
+        // אחרי השמירה מצב הרשומות בזיכרון עדיין "Added", ולכן ספירת המושבים
+        // הפנויים במיפוי עלולה לחזור 0. קוראים את הטיסה מחדש מהמסד — עם מצב Unchanged.
+        var reloaded = await _flights.GetByIdAsync(flight.Id, ct) ?? flight;
+        return Result<FlightResponse>.Created(_mapper.Map<FlightResponse>(reloaded));
     }
 
     // ── עזר ──────────────────────────────────────────────────────────────

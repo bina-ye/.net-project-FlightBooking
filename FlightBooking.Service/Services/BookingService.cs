@@ -203,6 +203,44 @@ public class BookingService : IBookingService
             new PagedResult<BookingSummaryResponse>(mapped, pageNumber, pageSize, totalCount));
     }
 
+    public async Task<Result<PagedResult<BookingSummaryResponse>>> GetAllBookingsAsync(
+        bool isAdmin, int pageNumber, int pageSize, CancellationToken ct = default)
+    {
+        // הרשאה נבדקת בשרת — לא בצד הלקוח
+        if (!isAdmin)
+            return Result<PagedResult<BookingSummaryResponse>>.Forbidden(
+                "אין הרשאת מנהל לצפייה בכל ההזמנות.");
+
+        pageNumber = Math.Max(1, pageNumber);
+        pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
+
+        var (items, totalCount) = await _bookings.GetAllAsync(pageNumber, pageSize, ct);
+
+        var mapped = items.Select(b => new BookingSummaryResponse
+        {
+            Id = b.Id,
+            BookingReference = b.BookingReference,
+            Status = b.Status.ToString(),
+            CreatedAt = b.CreatedAt,
+            TotalAmount = b.TotalAmount,
+            FlightsCount = b.BookingFlights.Count,
+            SeatsCount = b.Seats.Count,
+            FirstDepartureTime = b.BookingFlights
+                .Select(bf => (DateTime?)bf.Flight.DepartureTime)
+                .Min(),
+            // פרטי בעל ההזמנה — נדרשים למנהל כדי לדעת של מי ההזמנה
+            PassengerFullName = b.PassengerFullName,
+            CustomerEmail = b.User?.Email
+        }).ToList();
+
+        _logger.LogInformation(
+            "Admin listed all bookings: page {Page}, {Count} of {Total}",
+            pageNumber, mapped.Count, totalCount);
+
+        return Result<PagedResult<BookingSummaryResponse>>.Ok(
+            new PagedResult<BookingSummaryResponse>(mapped, pageNumber, pageSize, totalCount));
+    }
+
     private async Task<string> GenerateReferenceAsync(CancellationToken ct)
     {
         // 6 תווים, אותיות וספרות — מספיק לשימוש, עם בדיקת ייחודיות

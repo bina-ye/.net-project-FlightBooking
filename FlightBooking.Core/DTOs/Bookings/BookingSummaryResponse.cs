@@ -10,4 +10,8 @@ public class BookingSummaryResponse
     public int FlightsCount { get; set; }
     public int SeatsCount { get; set; }
     public DateTime? FirstDepartureTime { get; set; }
+
+    // ---- לבעל ההזמנה (מנהל) ----
+    public string? PassengerFullName { get; set; }
+    public string? CustomerEmail { get; set; }
 }

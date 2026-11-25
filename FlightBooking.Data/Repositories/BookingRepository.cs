@@ -79,6 +79,33 @@ public class BookingRepository : IBookingRepository
         return (items, totalCount);
     }
 
+    public async Task<(IReadOnlyList<Booking> Items, int TotalCount)> GetAllAsync(
+        int pageNumber,
+        int pageSize,
+        CancellationToken ct = default)
+    {
+        var query = _context.Bookings.AsNoTracking();
+
+        var totalCount = await query.CountAsync(ct);
+
+        var items = await query
+            .OrderByDescending(b => b.CreatedAt)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .Include(b => b.Seats)
+            .Include(b => b.BookingFlights)
+                .ThenInclude(bf => bf.Flight)
+                    .ThenInclude(f => f.OriginAirport)
+            .Include(b => b.BookingFlights)
+                .ThenInclude(bf => bf.Flight)
+                    .ThenInclude(f => f.DestinationAirport)
+            .Include(b => b.User)
+            .AsSplitQuery()
+            .ToListAsync(ct);
+
+        return (items, totalCount);
+    }
+
     public async Task<bool> ReferenceExistsAsync(string bookingReference, CancellationToken ct = default)
     {
         return await _context.Bookings

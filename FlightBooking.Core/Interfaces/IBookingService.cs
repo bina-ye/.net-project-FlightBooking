@@ -21,6 +21,13 @@ public interface IBookingService
         int pageNumber,
         int pageSize,
         CancellationToken ct = default);
+
+    /// <summary>כל ההזמנות של כל הלקוחות — מנהל בלבד.</summary>
+    Task<Result<PagedResult<BookingSummaryResponse>>> GetAllBookingsAsync(
+        bool isAdmin,
+        int pageNumber,
+        int pageSize,
+        CancellationToken ct = default);
     Task<Result<BookingResponse>> CancelAsync(
     int bookingId,
     int userId,

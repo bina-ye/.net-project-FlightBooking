@@ -15,6 +15,12 @@ public interface IBookingRepository
         int pageSize,
         CancellationToken ct = default);
 
+    /// <summary>כל ההזמנות במערכת — למנהל בלבד (ההרשאה נבדקת בשכבת השירות).</summary>
+    Task<(IReadOnlyList<Booking> Items, int TotalCount)> GetAllAsync(
+        int pageNumber,
+        int pageSize,
+        CancellationToken ct = default);
+
     Task<bool> ReferenceExistsAsync(string bookingReference, CancellationToken ct = default);
 
     Task AddAsync(Booking booking, CancellationToken ct = default);

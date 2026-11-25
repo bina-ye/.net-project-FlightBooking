@@ -99,6 +99,32 @@ public class BookingsController : ControllerBase
         };
     }
 
+    /// <summary>כל ההזמנות של כל הלקוחות — מנהל בלבד.</summary>
+    [HttpGet("all")]
+    [ProducesResponseType(typeof(PagedResult<BookingSummaryResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetAllBookings(
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 10,
+        CancellationToken ct = default)
+    {
+        var userId = GetUserId();
+        if (userId is null)
+            return Unauthorized(new { message = "טוקן לא תקין." });
+
+        var result = await _bookings.GetAllBookingsAsync(
+            User.IsInRole("Admin"), pageNumber, pageSize, ct);
+
+        return result.Status switch
+        {
+            ResultStatus.Ok => Ok(result.Value),
+            ResultStatus.Forbidden => StatusCode(
+                StatusCodes.Status403Forbidden, new { message = result.ErrorMessage }),
+            _ => BadRequest(new { message = result.ErrorMessage })
+        };
+    }
+
     private int? GetUserId()
     {
         var value = User.FindFirstValue(ClaimTypes.NameIdentifier);
